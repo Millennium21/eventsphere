@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package eventsphere.inventory.v1;
+
+// InventoryService owns seat/capacity availability for events and is the
+// single source of truth used to prevent overbooking. It is called
+// synchronously (gRPC) by the API service's booking flow, and it also
+// consumes `events.created` / `events.updated` from Kafka (via a separate
+// worker process) to stay in sync with events owned by the API service.
+service InventoryService {
+  // Creates the inventory record for a newly-created event. Invoked by the
+  // inventory-worker's Kafka consumer, not directly by clients.
+  rpc InitializeInventory(InitializeInventoryRequest) returns (InventoryResponse);
+
+  // Adjusts total capacity for an event (e.g. venue/capacity change).
+  rpc AdjustCapacity(AdjustCapacityRequest) returns (InventoryResponse);
+
+  // Attempts to reserve `quantity` seats for `event_id` on behalf of
+  // `order_id`. Protected by a short-lived Redis lock plus an optimistic
+  // (version-column) DB transaction so concurrent requests for the same
+  // hot event cannot oversell capacity.
+  rpc ReserveSeats(ReserveSeatsRequest) returns (ReservationResponse);
+
+  // Confirms a PENDING reservation (called after payment succeeds).
+  rpc ConfirmReservation(ReservationIdRequest) returns (ReservationResponse);
+
+  // Releases a reservation's seats back to the available pool. Used for
+  // explicit cancellations and for expiry sweeps.
+  rpc ReleaseReservation(ReservationIdRequest) returns (ReservationResponse);
+
+  // Read-only availability lookup.
+  rpc GetAvailability(EventIdRequest) returns (InventoryResponse);
+}
+
+message InitializeInventoryRequest {
+  string event_id = 1;
+  int32 total_capacity = 2;
+}
+
+message AdjustCapacityRequest {
+  string event_id = 1;
+  int32 new_total_capacity = 2;
+}
+
+message ReserveSeatsRequest {
+  string event_id = 1;
+  string order_id = 2;
+  int32 quantity = 3;
+}
+
+message ReservationIdRequest {
+  string reservation_id = 1;
+}
+
+message EventIdRequest {
+  string event_id = 1;
+}
+
+enum ReservationStatus {
+  RESERVATION_STATUS_UNSPECIFIED = 0;
+  PENDING = 1;
+  CONFIRMED = 2;
+  RELEASED = 3;
+  EXPIRED = 4;
+}
+
+message ReservationResponse {
+  bool success = 1;
+  string message = 2;
+  string reservation_id = 3;
+  string event_id = 4;
+  string order_id = 5;
+  int32 quantity = 6;
+  ReservationStatus status = 7;
+  int64 expires_at_unix = 8;
+}
+
+message InventoryResponse {
+  bool success = 1;
+  string message = 2;
+  string event_id = 3;
+  int32 total_capacity = 4;
+  int32 reserved_count = 5;
+  int32 confirmed_count = 6;
+  int32 available = 7;
+  int32 version = 8;
+}
