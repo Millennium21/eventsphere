@@ -1,0 +1,18 @@
+[project]
+name = "eventsphere"
+version = "1.0.0"
+description = "Distributed event ticketing platform: FastAPI REST + gRPC inventory microservices over Kafka, Postgres, and Redis."
+requires-python = ">=3.12"
+readme = "README.md"
+
+[tool.ruff]
+line-length = 115
+target-version = "py312"
+exclude = ["services/shared/generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "N", "ASYNC"]
+ignore = ["N802"]  # gRPC servicer methods use PascalCase to match the generated interface
+
+[tool.ruff.lint.isort]
+known-first-party = ["services"]
