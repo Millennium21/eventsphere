@@ -1,0 +1,14 @@
+# Runtime dependencies for services/inventory only (see infra/Dockerfile.inventory).
+grpcio==1.82.1
+grpcio-health-checking==1.82.1
+grpcio-reflection==1.82.1
+
+sqlalchemy==2.0.51
+asyncpg==0.31.0
+
+redis==8.0.1
+aiokafka==0.14.0
+
+pydantic-settings==2.14.2
+structlog==26.1.0
+tenacity==9.1.4
