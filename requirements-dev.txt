@@ -1,0 +1,16 @@
+# Everything needed to run the full test suite and tooling locally
+# without Docker: both services' runtime dependencies plus dev tooling.
+# Docker images do NOT use this file — see services/api/requirements.txt
+# and services/inventory/requirements.txt for the per-image subsets.
+-r services/api/requirements.txt
+-r services/inventory/requirements.txt
+
+grpcio-tools==1.82.1
+
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0
+httpx==0.28.1
+
+ruff==0.15.22
+mypy==2.3.0
