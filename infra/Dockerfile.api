@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+# Multi-stage build: a full build environment compiles/installs
+# dependencies, then only the installed packages + application source
+# are copied into a slim runtime image (no compilers, no pip cache,
+# no build-time-only files in the final image).
+
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY services/api/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+
+FROM python:3.12-slim AS runtime
+
+RUN groupadd --gid 1000 eventsphere \
+    && useradd --uid 1000 --gid eventsphere --shell /bin/bash --create-home eventsphere
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH="/app" \
+    PYTHONUNBUFFERED="1" \
+    PYTHONDONTWRITEBYTECODE="1"
+
+WORKDIR /app
+# The whole services/ tree is copied (not just services/api) so that
+# `from services.shared... import ...` resolves identically to local
+# development — see the README's "why absolute services.* imports"
+# note. The extra ~50KB of unused sibling-service source in the image
+# is a trade this project makes deliberately for import-path simplicity.
+COPY services/ /app/services/
+
+USER eventsphere
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
+
+CMD ["uvicorn", "services.api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

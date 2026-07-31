@@ -1,0 +1,42 @@
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY services/inventory/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+
+FROM python:3.12-slim AS runtime
+
+RUN groupadd --gid 1000 eventsphere \
+    && useradd --uid 1000 --gid eventsphere --shell /bin/bash --create-home eventsphere
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH="/app" \
+    PYTHONUNBUFFERED="1" \
+    PYTHONDONTWRITEBYTECODE="1"
+
+WORKDIR /app
+COPY services/ /app/services/
+
+USER eventsphere
+EXPOSE 50051
+
+# grpc_health_probe would be the more idiomatic exec-probe binary for
+# gRPC, but the health-check line below avoids a second binary
+# dependency in the image; Kubernetes itself uses the native gRPC probe
+# type instead of this HEALTHCHECK (see infra/kubernetes/inventory.yaml).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "\
+import grpc; from grpc_health.v1 import health_pb2, health_pb2_grpc; \
+channel = grpc.insecure_channel('localhost:50051'); \
+stub = health_pb2_grpc.HealthStub(channel); \
+resp = stub.Check(health_pb2.HealthCheckRequest(), timeout=5); \
+exit(0 if resp.status == health_pb2.HealthCheckResponse.SERVING else 1)" || exit 1
+
+CMD ["python", "-m", "services.inventory.app.main"]
