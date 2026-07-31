@@ -16,3 +16,14 @@ ignore = ["N802"]  # gRPC servicer methods use PascalCase to match the generated
 
 [tool.ruff.lint.isort]
 known-first-party = ["services"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "integration: needs real Postgres/Redis (and sometimes an in-process gRPC server)",
+    "contract: verifies the gRPC/OpenAPI contracts in isolation",
+]
