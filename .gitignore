@@ -32,3 +32,5 @@ Thumbs.db
 
 # Alembic
 migrations/versions/*.pyc
+
+infra/kubernetes/secret.yaml

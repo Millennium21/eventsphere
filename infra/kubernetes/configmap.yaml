@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eventsphere-config
+  namespace: eventsphere
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  # In production these point at managed AWS services rather than
+  # in-cluster pods: ElastiCache (Redis) and MSK (Kafka) — see the
+  # README's deployment guide for the full mapping. DATABASE_URL lives
+  # in the Secret instead of here since it embeds a password.
+  REDIS_URL: "redis://eventsphere.xxxxxx.ng.0001.euw2.cache.amazonaws.com:6379/0"
+  KAFKA_BOOTSTRAP_SERVERS: "b-1.eventsphere.xxxxxx.c2.kafka.eu-west-2.amazonaws.com:9092,b-2.eventsphere.xxxxxx.c2.kafka.eu-west-2.amazonaws.com:9092"
+  INVENTORY_GRPC_TARGET: "inventory.eventsphere.svc.cluster.local:50051"
+  JWT_ALGORITHM: "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  RATE_LIMIT_PER_MINUTE: "60"
+  RESERVATION_TTL_SECONDS: "600"

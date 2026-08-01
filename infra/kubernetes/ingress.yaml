@@ -1,0 +1,31 @@
+# Targets the AWS Load Balancer Controller, which is the standard way to
+# expose a Service externally on EKS (provisions a real ALB backed by
+# this Ingress's rules). Requires the controller to already be installed
+# in the cluster — see the README's deployment guide.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eventsphere-api
+  namespace: eventsphere
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /api/v1/health
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    # ACM certificate ARN for the domain this is served on — set via CI/CD
+    # or a values overlay, not hardcoded here.
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-west-2:...
+spec:
+  rules:
+    - host: api.eventsphere.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 80
