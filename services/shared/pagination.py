@@ -1,7 +1,7 @@
 """Offset/limit pagination shared by every list endpoint.
 
-Offset/limit is simple and matches the "pagination" requirement; for scalability, 
-keyset (cursor) pagination is the natural next step once any single listing gets 
+Offset/limit is simple and matches the "pagination" requirement; for scalability,
+keyset (cursor) pagination is the natural next step once any single listing gets
 deep enough that OFFSET starts costing real query time.
 """
 
@@ -41,4 +41,6 @@ class Page[T](BaseModel):
 
     @classmethod
     def create(cls, items: list[T], total: int, params: PaginationParams) -> Page[T]:
-        return cls(items=items, total=total, page=params.page, page_size=params.page_size)
+        return cls(
+            items=items, total=total, page=params.page, page_size=params.page_size
+        )
