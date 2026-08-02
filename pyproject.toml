@@ -8,7 +8,7 @@ readme = "README.md"
 [tool.ruff]
 line-length = 115
 target-version = "py312"
-exclude = ["services/shared/generated"]
+exclude = ["services/shared/generated", "migrations/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "N", "ASYNC"]
@@ -16,6 +16,13 @@ ignore = ["N802"]  # gRPC servicer methods use PascalCase to match the generated
 
 [tool.ruff.lint.isort]
 known-first-party = ["services"]
+
+[tool.mypy]
+python_version = "3.12"
+exclude = ["services/shared/generated", "migrations"]
+ignore_missing_imports = true
+disallow_untyped_defs = false
+warn_unused_ignores = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
