@@ -8,6 +8,7 @@ from services.api.app.models.event import Event
 from services.api.app.schemas.event import EventSearchParams
 from services.shared.db.repository import BaseRepository
 
+
 class EventRepository(BaseRepository[Event]):
     model = Event
 

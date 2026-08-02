@@ -7,7 +7,7 @@ deep enough that OFFSET starts costing real query time.
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -27,7 +27,7 @@ class PaginationParams(BaseModel):
         return (self.page - 1) * self.page_size
 
 
-class Page(BaseModel, Generic[T]):
+class Page[T](BaseModel):
     items: list[T]
     total: int
     page: int

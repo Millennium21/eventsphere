@@ -5,6 +5,7 @@ from sqlalchemy import select
 from services.api.app.models.user import User
 from services.shared.db.repository import BaseRepository
 
+
 class UserRepository(BaseRepository[User]):
     model = User
 

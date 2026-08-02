@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from services.api.app.models.order import Order
 from services.shared.db.repository import BaseRepository
 
+
 class OrderRepository(BaseRepository[Order]):
     model = Order
 
