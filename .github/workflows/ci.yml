@@ -21,11 +21,11 @@ jobs:
       - name: Check generated gRPC stubs are up to date
         run: |
           cp -r services/shared/generated /tmp/generated-before
-          ./scripts/generate_proto.sh
+          bash ./scripts/generate_proto.sh
           diff -r /tmp/generated-before services/shared/generated \
             || (echo "::error::proto/inventory.proto changed but services/shared/generated wasn't regenerated — run scripts/generate_proto.sh and commit the result" && exit 1)
-      - run: mypy services --config-file pyproject.toml || true # advisory for now; not yet a hard gate
-
+            - run: mypy services --config-file pyproject.toml || true # advisory for now; not yet a hard gate
+            
   test:
     runs-on: ubuntu-latest
 
