@@ -45,7 +45,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     app.state.redis = Redis.from_url(settings.redis_url)
 
-    app.state.kafka_producer = KafkaEventProducer(settings.kafka_bootstrap_servers)
+    app.state.kafka_producer = KafkaEventProducer(
+        settings.kafka_bootstrap_servers,
+        security_protocol=settings.kafka_security_protocol,
+        sasl_mechanism=settings.kafka_sasl_mechanism,
+        sasl_username=settings.kafka_sasl_username,
+        sasl_password=settings.kafka_sasl_password,
+    )
     await app.state.kafka_producer.start()
 
     app.state.inventory_client = InventoryClient(

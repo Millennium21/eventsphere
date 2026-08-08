@@ -10,7 +10,7 @@ from services.api.app.db.session import SessionFactory
 from services.api.app.models.order import Order
 from services.api.app.models.user import User
 from services.shared.kafka.consumer import BaseKafkaConsumer
-from services.shared.kafka.topics import GROUP_API_NOTIFICATION_WORKER, Topic
+from services.shared.kafka.topics import GROUP_API_NOTIFICATION_WORKER, EventType, Topic
 
 logger = structlog.get_logger(__name__)
 
@@ -37,19 +37,25 @@ async def _handle_message(message: dict[str, Any]) -> None:
             return
 
     match event_type:
-        case Topic.TICKET_ISSUED.value:
+        case EventType.TICKET_ISSUED.value:
             await _send_mock_email(to=user.email, subject="Your tickets are confirmed!", order_id=order_id)
-        case Topic.ORDER_CANCELLED.value:
+        case EventType.ORDER_CANCELLED.value:
             await _send_mock_email(to=user.email, subject="Your order was cancelled", order_id=order_id)
         case _:
             logger.warning("notification_worker_unknown_event_type", event_type=event_type)
 
 
 async def run_notification_worker(settings: Settings) -> None:
+    # TICKET_ISSUED and ORDER_CANCELLED now share one physical topic
+    # (Topic.ORDERS_NOTIFICATIONS) - see topics.py.
     consumer = BaseKafkaConsumer(
-        topics=[Topic.TICKET_ISSUED, Topic.ORDER_CANCELLED],
+        topics=[Topic.ORDERS_NOTIFICATIONS],
         group_id=GROUP_API_NOTIFICATION_WORKER,
         bootstrap_servers=settings.kafka_bootstrap_servers,
         handler=_handle_message,
+        security_protocol=settings.kafka_security_protocol,
+        sasl_mechanism=settings.kafka_sasl_mechanism,
+        sasl_username=settings.kafka_sasl_username,
+        sasl_password=settings.kafka_sasl_password,
     )
     await consumer.run()

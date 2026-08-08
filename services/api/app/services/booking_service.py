@@ -13,14 +13,14 @@ from services.shared.enums import OrderStatus
 from services.shared.errors import AuthorizationError, NotFoundError, ValidationError
 from services.shared.kafka.producer import KafkaEventProducer
 from services.shared.kafka.schemas import OrderCancelledPayload, OrderCreatedPayload
-from services.shared.kafka.topics import Topic
+from services.shared.kafka.topics import EventType
 from services.shared.pagination import Page, PaginationParams
 
 logger = structlog.get_logger(__name__)
 
 
 class BookingService:
-    """The booking flow: gRPC reservation, Order persistence, and the
+    """Owns the booking flow: gRPC reservation, Order persistence, and the
     OrderCreated event that kicks off the async payment/notification
     pipeline (see services/api/app/workers/).
 
@@ -84,7 +84,7 @@ class BookingService:
         await self._orders.session.commit()
 
         await self._kafka.publish(
-            Topic.ORDER_CREATED,
+            EventType.ORDER_CREATED,
             key=str(order.id),
             payload=OrderCreatedPayload(
                 order_id=order.id,
@@ -122,7 +122,7 @@ class BookingService:
         await self._orders.session.commit()
 
         await self._kafka.publish(
-            Topic.ORDER_CANCELLED,
+            EventType.ORDER_CANCELLED,
             key=str(order.id),
             payload=OrderCancelledPayload(order_id=order.id, reservation_id=order.reservation_id),
         )

@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     optimistic_retry_attempts: int = 5
 
     kafka_bootstrap_servers: str = "localhost:9092"
+    kafka_security_protocol: str = "PLAINTEXT"
+    kafka_sasl_mechanism: str | None = None
+    kafka_sasl_username: str | None = None
+    kafka_sasl_password: str | None = None
 
     grpc_port: int = 50051
     reservation_ttl_seconds: int = 600  # 10 minutes

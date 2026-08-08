@@ -13,7 +13,7 @@ from services.shared.enums import OrderStatus
 from services.shared.kafka.consumer import BaseKafkaConsumer
 from services.shared.kafka.producer import KafkaEventProducer
 from services.shared.kafka.schemas import OrderCancelledPayload, TicketIssuedPayload
-from services.shared.kafka.topics import GROUP_API_ORDER_STATUS_WORKER, Topic
+from services.shared.kafka.topics import GROUP_API_ORDER_STATUS_WORKER, EventType, Topic
 
 logger = structlog.get_logger(__name__)
 
@@ -32,7 +32,7 @@ async def _handle_payment_processed(
             order.status = OrderStatus.CONFIRMED
             await session.commit()
             await producer.publish(
-                Topic.TICKET_ISSUED,
+                EventType.TICKET_ISSUED,
                 key=str(order.id),
                 payload=TicketIssuedPayload(order_id=order.id, user_id=order.user_id, event_id=order.event_id),
             )
@@ -42,7 +42,7 @@ async def _handle_payment_processed(
             order.status = OrderStatus.CANCELLED
             await session.commit()
             await producer.publish(
-                Topic.ORDER_CANCELLED,
+                EventType.ORDER_CANCELLED,
                 key=str(order.id),
                 payload=OrderCancelledPayload(order_id=order.id, reservation_id=order.reservation_id),
             )
@@ -67,9 +67,9 @@ async def _handle_message(
     payload = message.get("payload", {})
 
     match event_type:
-        case Topic.PAYMENT_PROCESSED.value:
+        case EventType.PAYMENT_PROCESSED.value:
             await _handle_payment_processed(inventory, producer, payload)
-        case Topic.RESERVATION_EXPIRED.value:
+        case EventType.RESERVATION_EXPIRED.value:
             await _handle_reservation_expired(payload)
         case _:
             logger.warning("order_status_worker_unknown_event_type", event_type=event_type)
@@ -80,14 +80,28 @@ async def run_order_status_worker(settings: Settings) -> None:
         settings.inventory_grpc_target, timeout_seconds=settings.inventory_grpc_timeout_seconds
     )
     await inventory.start()
-    producer = KafkaEventProducer(settings.kafka_bootstrap_servers)
+    producer = KafkaEventProducer(
+        settings.kafka_bootstrap_servers,
+        security_protocol=settings.kafka_security_protocol,
+        sasl_mechanism=settings.kafka_sasl_mechanism,
+        sasl_username=settings.kafka_sasl_username,
+        sasl_password=settings.kafka_sasl_password,
+    )
     await producer.start()
     try:
+        # PAYMENT_PROCESSED and RESERVATION_EXPIRED now share one physical
+        # topic (Topic.ORDERS_STATUS_CHANGED) - see topics.py - so this
+        # worker subscribes to one topic instead of two, but the
+        # match-on-event_type dispatch above is unchanged.
         consumer = BaseKafkaConsumer(
-            topics=[Topic.PAYMENT_PROCESSED, Topic.RESERVATION_EXPIRED],
+            topics=[Topic.ORDERS_STATUS_CHANGED],
             group_id=GROUP_API_ORDER_STATUS_WORKER,
             bootstrap_servers=settings.kafka_bootstrap_servers,
             handler=lambda message: _handle_message(inventory, producer, message),
+            security_protocol=settings.kafka_security_protocol,
+            sasl_mechanism=settings.kafka_sasl_mechanism,
+            sasl_username=settings.kafka_sasl_username,
+            sasl_password=settings.kafka_sasl_password,
         )
         await consumer.run()
     finally:

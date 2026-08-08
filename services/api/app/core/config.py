@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     kafka_bootstrap_servers: str = "localhost:9092"
+    # PLAINTEXT works against the local docker-compose broker; a managed
+    # broker that requires auth (e.g. Aiven's free Kafka tier) needs
+    # KAFKA_SECURITY_PROTOCOL=SASL_SSL plus the three fields below --
+    # see the README's deployment guide.
+    kafka_security_protocol: str = "PLAINTEXT"
+    kafka_sasl_mechanism: str | None = None
+    kafka_sasl_username: str | None = None
+    kafka_sasl_password: str | None = None
 
     inventory_grpc_target: str = "localhost:50051"
     inventory_grpc_timeout_seconds: float = 5.0

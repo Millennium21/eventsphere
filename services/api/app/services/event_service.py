@@ -12,7 +12,7 @@ from services.shared.enums import UserRole
 from services.shared.errors import AuthorizationError, NotFoundError
 from services.shared.kafka.producer import KafkaEventProducer
 from services.shared.kafka.schemas import EventCreatedPayload, EventUpdatedPayload
-from services.shared.kafka.topics import Topic
+from services.shared.kafka.topics import EventType
 from services.shared.pagination import Page, PaginationParams
 
 logger = structlog.get_logger(__name__)
@@ -29,7 +29,7 @@ class EventService:
         await self._events.session.commit()
 
         await self._kafka.publish(
-            Topic.EVENT_CREATED,
+            EventType.EVENT_CREATED,
             key=str(event.id),
             payload=EventCreatedPayload(event_id=event.id, total_seats=event.total_seats),
         )
@@ -57,7 +57,7 @@ class EventService:
 
         if seats_changed:
             await self._kafka.publish(
-                Topic.EVENT_UPDATED,
+                EventType.EVENT_UPDATED,
                 key=str(event.id),
                 payload=EventUpdatedPayload(event_id=event.id, total_seats=event.total_seats),
             )
