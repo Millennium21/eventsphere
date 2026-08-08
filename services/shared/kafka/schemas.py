@@ -14,7 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from services.shared.kafka.topics import Topic
+from services.shared.kafka.topics import EventType
 
 
 class EventEnvelope(BaseModel):
@@ -24,8 +24,11 @@ class EventEnvelope(BaseModel):
     payload: dict[str, Any]
 
     @classmethod
-    def wrap(cls, topic: Topic, payload: BaseModel) -> EventEnvelope:
-        return cls(event_type=topic.value, payload=payload.model_dump(mode="json"))
+    def wrap(cls, event_type: EventType, payload: BaseModel) -> EventEnvelope:
+        # event_type is stamped from the logical EventType, not from
+        # whichever physical Topic it happens to be published on - see
+        # topics.py's docstring for why that separation matters.
+        return cls(event_type=event_type.value, payload=payload.model_dump(mode="json"))
 
 
 class EventCreatedPayload(BaseModel):

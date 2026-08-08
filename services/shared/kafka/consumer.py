@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import ssl
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -39,19 +40,33 @@ class BaseKafkaConsumer:
         group_id: str,
         bootstrap_servers: str,
         handler: Handler,
+        security_protocol: str = "PLAINTEXT",
+        sasl_mechanism: str | None = None,
+        sasl_username: str | None = None,
+        sasl_password: str | None = None,
     ) -> None:
         self._topics = [t.value for t in topics]
         self._group_id = group_id
         self._bootstrap_servers = bootstrap_servers
         self._handler = handler
+        self._security_protocol = security_protocol
+        self._sasl_mechanism = sasl_mechanism
+        self._sasl_username = sasl_username
+        self._sasl_password = sasl_password
         self._consumer: AIOKafkaConsumer | None = None
         self._stopping = asyncio.Event()
 
     async def run(self) -> None:
+        ssl_context = ssl.create_default_context() if self._security_protocol == "SASL_SSL" else None
         self._consumer = AIOKafkaConsumer(
             *self._topics,
             bootstrap_servers=self._bootstrap_servers,
             group_id=self._group_id,
+            security_protocol=self._security_protocol,
+            sasl_mechanism=self._sasl_mechanism,
+            sasl_plain_username=self._sasl_username,
+            sasl_plain_password=self._sasl_password,
+            ssl_context=ssl_context,
             enable_auto_commit=False,
             auto_offset_reset="earliest",
             value_deserializer=lambda v: json.loads(v.decode("utf-8")),
