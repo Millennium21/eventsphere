@@ -8,7 +8,7 @@ from services.inventory.app.core.config import Settings
 from services.inventory.app.services.inventory_service import InventoryService
 from services.shared.kafka.producer import KafkaEventProducer
 from services.shared.kafka.schemas import ReservationExpiredPayload
-from services.shared.kafka.topics import Topic
+from services.shared.kafka.topics import EventType
 
 logger = structlog.get_logger(__name__)
 
@@ -24,14 +24,20 @@ async def run_reservation_reaper(service: InventoryService, settings: Settings) 
     inventory for much simpler code, which is a reasonable trade for a
     ticketing system where reservations are already short-lived.
     """
-    producer = KafkaEventProducer(settings.kafka_bootstrap_servers)
+    producer = KafkaEventProducer(
+        settings.kafka_bootstrap_servers,
+        security_protocol=settings.kafka_security_protocol,
+        sasl_mechanism=settings.kafka_sasl_mechanism,
+        sasl_username=settings.kafka_sasl_username,
+        sasl_password=settings.kafka_sasl_password,
+    )
     await producer.start()
     try:
         while True:
             released = await service.sweep_expired_reservations()
             for reservation in released:
                 await producer.publish(
-                    Topic.RESERVATION_EXPIRED,
+                    EventType.RESERVATION_EXPIRED,
                     key=str(reservation.event_id),
                     payload=ReservationExpiredPayload(
                         reservation_id=str(reservation.id),
