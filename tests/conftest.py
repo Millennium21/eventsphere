@@ -33,7 +33,7 @@ from services.shared.db.base import Base
 from services.shared.enums import UserRole
 from services.shared.generated import inventory_pb2_grpc
 from services.shared.kafka.schemas import EventEnvelope
-from services.shared.kafka.topics import Topic
+from services.shared.kafka.topics import EventType
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/eventsphere_test"
@@ -67,24 +67,24 @@ class FakeKafkaProducer:
     async def stop(self) -> None:
         pass
 
-    async def publish(self, topic: Topic, key: str, payload) -> None:  # noqa: ANN001
-        envelope = EventEnvelope.wrap(topic, payload)
+    async def publish(self, event_type: EventType, key: str, payload) -> None:  # noqa: ANN001
+        envelope = EventEnvelope.wrap(event_type, payload)
         self.published.append(envelope)
 
         if self._inventory_client is None:
             return
-        match topic:
-            case Topic.EVENT_CREATED:
+        match event_type:
+            case EventType.EVENT_CREATED:
                 await self._inventory_client.initialize_inventory(
                     event_id=payload.event_id, total_capacity=payload.total_seats
                 )
-            case Topic.EVENT_UPDATED:
+            case EventType.EVENT_UPDATED:
                 await self._inventory_client.adjust_capacity(
                     event_id=payload.event_id, new_total_capacity=payload.total_seats
                 )
 
-    def events_of_type(self, topic: Topic) -> list[EventEnvelope]:
-        return [e for e in self.published if e.event_type == topic.value]
+    def events_of_type(self, event_type: EventType) -> list[EventEnvelope]:
+        return [e for e in self.published if e.event_type == event_type.value]
 
 
 @pytest_asyncio.fixture(scope="session")

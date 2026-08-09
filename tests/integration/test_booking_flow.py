@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 
-from services.shared.kafka.topics import Topic
+from services.shared.kafka.topics import EventType
 from tests.conftest import FakeKafkaProducer, auth_headers_for
 
 pytestmark = pytest.mark.integration
@@ -112,7 +112,7 @@ async def test_booking_reduces_capacity_and_publishes_order_created(
     assert order["total_price_cents"] == 5000
     assert order["status"] == "pending"
 
-    order_created_events = fake_kafka_producer.events_of_type(Topic.ORDER_CREATED)
+    order_created_events = fake_kafka_producer.events_of_type(EventType.ORDER_CREATED)
     assert len(order_created_events) == 1
     assert order_created_events[0].payload["quantity"] == 2
 
@@ -144,7 +144,7 @@ async def test_booking_with_same_idempotency_key_returns_the_same_order(
     assert second.status_code == 201
     assert first.json()["id"] == second.json()["id"]
     # Only one reservation/order should actually have been created.
-    assert len(fake_kafka_producer.events_of_type(Topic.ORDER_CREATED)) == 1
+    assert len(fake_kafka_producer.events_of_type(EventType.ORDER_CREATED)) == 1
 
 
 async def test_cancel_order_releases_seats_and_publishes_cancelled(
@@ -170,7 +170,7 @@ async def test_cancel_order_releases_seats_and_publishes_cancelled(
     cancel_resp = await client.post(f"/api/v1/orders/{order['id']}/cancel", headers=headers)
     assert cancel_resp.status_code == 200
     assert cancel_resp.json()["status"] == "cancelled"
-    assert len(fake_kafka_producer.events_of_type(Topic.ORDER_CANCELLED)) == 1
+    assert len(fake_kafka_producer.events_of_type(EventType.ORDER_CANCELLED)) == 1
 
     # Seats are back: booking 2 again should now succeed.
     rebooked = await client.post("/api/v1/orders", json={"event_id": event["id"], "quantity": 2}, headers=headers)
