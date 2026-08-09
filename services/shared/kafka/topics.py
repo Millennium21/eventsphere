@@ -6,8 +6,8 @@ class EventType(StrEnum):
     EventType (see each worker's `match event_type:` block), never on
     the physical Kafka topic -- see Topic and TOPIC_FOR_EVENT_TYPE below.
     That indirection is what let this go from 7 physical topics down to
-    4 (to fit inside a 5-topic free-tier ceiling) by re-homing several 
-    EventTypes onto a shared Topic, without touching any consumer's dispatch 
+    4 (to fit inside a 5-topic free-tier ceiling) by re-homing several
+    EventTypes onto a shared Topic, without touching any consumer's dispatch
     logic: every consumer that read events off two separate topics already handled
     both event kinds via the same handler and the same match statement,
     so only the subscription list changes, not the handling code.
