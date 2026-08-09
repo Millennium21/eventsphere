@@ -1,0 +1,141 @@
+# Production variant: Postgres and Redis are still self-hosted in this
+# compose stack (self-hosting them has no free-tier constraints worth
+# avoiding), but Kafka is NOT - this file has no zookeeper/kafka/kafka-init
+# services at all. Point KAFKA_BOOTSTRAP_SERVERS and the KAFKA_SASL_* vars
+# at a managed broker instead (e.g. Aiven's free Kafka tier) via a real
+# .env file on the host. Every secret below is read from the host environment; 
+# none are hardcoded, and there is no insecure fallback default for JWT_SECRET_KEY
+# or the database password the way the local dev compose file has.
+#
+# Usage: docker compose -f infra/docker-compose.prod.yml --env-file .env up --build -d
+
+x-api-env: &api-env
+  ENVIRONMENT: production
+  LOG_LEVEL: INFO
+  DATABASE_URL: postgresql+asyncpg://eventsphere:${POSTGRES_PASSWORD}@postgres:5432/eventsphere
+  REDIS_URL: redis://redis:6379/0
+  KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+  KAFKA_SECURITY_PROTOCOL: ${KAFKA_SECURITY_PROTOCOL:-SASL_SSL}
+  KAFKA_SASL_MECHANISM: ${KAFKA_SASL_MECHANISM:-PLAIN}
+  KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME}
+  KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD}
+  INVENTORY_GRPC_TARGET: inventory:50051
+  JWT_SECRET_KEY: "${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set -- generate one with openssl rand -hex 32}"
+  CORS_ALLOW_ORIGINS: '["*"]'
+
+x-inventory-env: &inventory-env
+  ENVIRONMENT: production
+  LOG_LEVEL: INFO
+  DATABASE_URL: postgresql+asyncpg://eventsphere:${POSTGRES_PASSWORD}@postgres:5432/eventsphere
+  REDIS_URL: redis://redis:6379/0
+  KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+  KAFKA_SECURITY_PROTOCOL: ${KAFKA_SECURITY_PROTOCOL:-SASL_SSL}
+  KAFKA_SASL_MECHANISM: ${KAFKA_SASL_MECHANISM:-PLAIN}
+  KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME}
+  KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: eventsphere
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: eventsphere
+    # No `ports:` mapping - only reachable from other containers on this
+    # compose network, never from the host's public interface. Local dev's
+    # docker-compose.yml exposes 5432 for connecting a DB client from the
+    # host; production doesn't need that and shouldn't have it.
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eventsphere -d eventsphere"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *api-env
+      ALEMBIC_DATABASE_URL: postgresql+asyncpg://eventsphere:${POSTGRES_PASSWORD}@postgres:5432/eventsphere
+    entrypoint: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      inventory:
+        condition: service_started
+    environment: *api-env
+    ports:
+      - "8000:8000"  # the one port that actually needs to be public
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  api-worker:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    depends_on:
+      api:
+        condition: service_healthy
+    environment: *api-env
+    command: ["python", "-m", "services.api.app.workers.main"]
+    restart: unless-stopped
+
+  inventory:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.inventory
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment: *inventory-env
+    # No `ports:` mapping - gRPC only needs to be reachable from the api
+    # container over the internal Docker network, never publicly.
+    restart: unless-stopped
+
+  inventory-worker:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.inventory
+    depends_on:
+      inventory:
+        condition: service_started
+    environment: *inventory-env
+    command: ["python", "-m", "services.inventory.app.workers.main"]
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

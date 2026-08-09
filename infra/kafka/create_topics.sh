@@ -10,13 +10,10 @@ PARTITIONS="${DEFAULT_PARTITIONS:-3}"
 REPLICATION="${LOCAL_REPLICATION_FACTOR:-1}"
 
 TOPICS=(
-  "eventsphere.events.created"
-  "eventsphere.events.updated"
+  "eventsphere.events.lifecycle"
   "eventsphere.orders.created"
-  "eventsphere.payments.processed"
-  "eventsphere.tickets.issued"
-  "eventsphere.orders.cancelled"
-  "eventsphere.reservations.expired"
+  "eventsphere.orders.status-changed"
+  "eventsphere.orders.notifications"
 )
 
 echo "Waiting for Kafka at ${BOOTSTRAP}..."
